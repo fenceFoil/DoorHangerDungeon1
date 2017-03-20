@@ -56,6 +56,7 @@ bool arePassagesOpen() {
 	return rooms[3].numNeighbors > 0;
 }
 
+// Call again to reset state of map
 void setup() {
 	Serial.begin(115200);
 	randomSeed(analogRead(2));
@@ -84,9 +85,11 @@ void setup() {
 	pinMode(SFT_DATA, OUTPUT);
 	pinMode(SFT_CLK, OUTPUT);
 	
+	// Reset any changes to room graph
 	setupMap();
 }
 
+// Update a light attached to a shift register immediately
 byte shiftBuffer[2] = {0, 0};
 void setShiftLight(byte light, byte state) {
 	// Change buffer entry
@@ -103,6 +106,7 @@ void setShiftLight(byte light, byte state) {
 	digitalWrite(SFT_LATCH, LOW);
 }
 
+// Zombie lights are dimmable
 const byte ZOMBIE_LIGHT_PINS[] = {11, 10, 9, 5, 6};
 void setZombieLight(byte light, byte value) {
 	analogWrite(ZOMBIE_LIGHT_PINS[light], value);
@@ -130,13 +134,14 @@ void setMagicStuffLight(byte light, byte state) {
 	setShiftLight(MAGIC_STUFF_SHIFT_PINS[light], state);
 }
 
+// Convenience function to output a 3 bit number to the row of 3 zombie lights.
 void show3BitsOnZombies(int i) {
 	setZombieLight(0, 255 * ((i & 0x01) > 0));
 	setZombieLight(1, 255 * ((i & 0x02) > 0));
 	setZombieLight(2, 255 * ((i & 0x04) > 0));
 }
 
-
+// on second shift register
 const byte SECRET_PASSAGES_SHIFT_PINS[] = {7+8, 5+8};
 void setSecretPassagesLight(byte light, byte state) {
 	setShiftLight(SECRET_PASSAGES_SHIFT_PINS[light], state);
@@ -147,8 +152,10 @@ void setSecretSwitchLight(byte state) {
 	setShiftLight(SECRET_SWITCH_SHIFT_PIN, state);
 }
 
+// Wanderer's location
 int currRoom = 0;
 
+// Follows a few rules to choose which room the wanderer visits next
 int getNextWanderRoom () {
 	// get neighbors
 	Room r = rooms[currRoom];
@@ -181,15 +188,12 @@ int getNextWanderRoom () {
 	}
 }
 
+// Timing counters, used for animation
 byte playerCounter = 7;
 byte passagesCounter = 3;
 byte currRingLight = 0;
-void loop() {
-	// for (int i=0;i<18;i++){
-		// setPlayerLight(i%9, i/9);
-		// delay(1000);
-	// }
-	
+
+void loop() {	
 	if (--playerCounter <= 0) {
 		strip[0] = CRGB(0, 255, 255);
 		FastLED.show();
