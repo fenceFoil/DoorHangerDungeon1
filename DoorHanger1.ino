@@ -134,6 +134,12 @@ void setMagicStuffLight(byte light, byte state) {
 	setShiftLight(MAGIC_STUFF_SHIFT_PINS[light], state);
 }
 
+void setMagicStuffByFlag(byte flags) {
+	setShiftLight(3, (flags & 0x01) != 0);
+	setShiftLight(4, (flags & 0x02) != 0);
+	setShiftLight(5, (flags & 0x04) != 0);
+}
+
 // Convenience function to output a 3 bit number to the row of 3 zombie lights.
 void show3BitsOnZombies(int i) {
 	setZombieLight(0, 255 * ((i & 0x01) > 0));
@@ -189,34 +195,113 @@ int getNextWanderRoom () {
 }
 
 // Timing counters, used for animation
-byte playerCounter = 7;
-byte passagesCounter = 3;
+byte playerCounter = 0;
+byte passagesCounter = 70;
+byte ringCounter = 0;
 byte currRingLight = 0;
 
-void loop() {	
-	if (--playerCounter <= 0) {
-		strip[0] = CRGB(0, 255, 255);
-		FastLED.show();
+
+// Updates at 100 hz
+int fps = 100;
+
+unsigned int time = 0;
+
+#define WANDER_STATE 0
+#define INTRO_STATE 1
+#define CRYPT_FIGHT_STATE 2
+#define ZOMBIE_FIGHT_STATE 3
+#define MAGIC_STUFF_ANIMATION 4
+
+byte state = WANDER_STATE;
+
+// Magic stuff
+byte magicStuffFlags = 0;
+
+// Magic stuff animation
+unsigned int magicStuffAnimTime = 0;
+byte newStuffIndex = 0;
+
+// a number from 0 to 2
+void magicStuffAnimation (byte newStuffNum) {
+	state = MAGIC_STUFF_ANIMATION;
+	magicStuffAnimTime = 0;
+	newStuffIndex = newStuffNum;
+}
+
+void loop() {
+	if (state == WANDER_STATE) {
+		time++;
 		
-		setPlayerLight(currRoom, 0);
-		currRoom = getNextWanderRoom();
-		rooms[currRoom].visited = true;
-		setPlayerLight(currRoom, 1);
+		if (currRoom == 6 && ((magicStuffFlags & 0x01) == 0)) {
+			magicStuffAnimation (0);
+		} else if (currRoom == 8 && ((magicStuffFlags & 0x02) == 0)) {
+			magicStuffAnimation (1);
+		} else if (currRoom == 2 && ((magicStuffFlags & 0x04) == 0)) {
+			magicStuffAnimation (2);
+		}
+
+		if (currRoom == 3) {
+			strip[0] = CHSV ((time*3) % 256, 255, 255);
+			FastLED.show();
+		} else {
+			// Pulse at 1 hz
+			strip[0] = CHSV ((255/10.0)*currRoom, 255, triwave8(playerCounter * 5 / 2)/2);
+			FastLED.show();
+		}
+
+		if (--playerCounter <= 0) {
+			
+			setPlayerLight(currRoom, 0);
+			currRoom = getNextWanderRoom();
+			rooms[currRoom].visited = true;
+			setPlayerLight(currRoom, 1);
+			
+			playerCounter = 100;
+		}
 		
-		playerCounter = 10;
+		if (--passagesCounter <= 0) {
+			setPassagesOpen(random(6) > 2);
+			passagesCounter = 100;
+		}
+		
+		// update magic ring!
+		if (--ringCounter <= 0) {
+			setMagicRingLight(currRingLight, false);
+			currRingLight = (currRingLight+1) % 4;
+			if (currRoom == 3) {
+				setMagicRingLight(currRingLight, true);
+			}
+			
+			ringCounter = 10;
+		}
+		
+		delay(1000/fps);
+	} else if (state == MAGIC_STUFF_ANIMATION) {
+		// Show an animation
+		if (magicStuffAnimTime == 0) {
+			strip[0] = CRGB (0,0,0);
+			FastLED.show();
+		}
+		
+		// Spin magic stuff for start
+		#define MS_END_OF_START 27*3
+		if (magicStuffAnimTime < MS_END_OF_START) {
+			setMagicStuffByFlag((1 << (magicStuffAnimTime/3 % 3)));
+		} else if (magicStuffAnimTime >= MS_END_OF_START && magicStuffAnimTime < MS_END_OF_START + 100) {
+			setMagicStuffByFlag(magicStuffFlags | ((1 << newStuffIndex) * ((magicStuffAnimTime / 14) % 2)));
+		} else {
+			// Actually commit new flag
+			magicStuffFlags |= (1 << newStuffIndex);
+			
+			// Display stuff
+			setMagicStuffByFlag(magicStuffFlags);
+			
+			// End animation
+			state = WANDER_STATE;
+		}
+		
+		
+		magicStuffAnimTime++;
+		delay(1000/50);
 	}
-	
-	if (--passagesCounter <= 0) {
-		setPassagesOpen(random(6) > 2);
-		passagesCounter = 10;
-	}
-	
-	// update magic ring!
-	setMagicRingLight(currRingLight, false);
-	currRingLight = (currRingLight+1) % 4;
-	if (currRoom == 3) {
-		setMagicRingLight(currRingLight, true);
-	}
-	
-	delay(100);
 }
