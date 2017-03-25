@@ -196,7 +196,7 @@ int getNextWanderRoom () {
 
 // Timing counters, used for animation
 byte playerCounter = 0;
-byte passagesCounter = 70;
+byte passagesCounter = 30;
 byte ringCounter = 0;
 byte currRingLight = 0;
 
