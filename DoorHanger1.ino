@@ -202,7 +202,7 @@ byte currRingLight = 0;
 
 
 // Updates at 100 hz
-int fps = 100;
+int fps = 85;
 
 unsigned int time = 0;
 
@@ -245,7 +245,11 @@ void loop() {
 			FastLED.show();
 		} else {
 			// Pulse at 1 hz
-			strip[0] = CHSV ((255/10.0)*currRoom, 255, triwave8(playerCounter * 5 / 2)/2);
+			if (playerCounter < 105) {
+				strip[0] = CHSV (170, 255, triwave8(playerCounter * 5 / 2)/2);
+			} else {
+				strip[0] = CRGB(0, 0, 0);
+			}
 			FastLED.show();
 		}
 
@@ -256,12 +260,12 @@ void loop() {
 			rooms[currRoom].visited = true;
 			setPlayerLight(currRoom, 1);
 			
-			playerCounter = 100;
+			playerCounter = 180;
 		}
 		
 		if (--passagesCounter <= 0) {
 			setPassagesOpen(random(6) > 2);
-			passagesCounter = 100;
+			passagesCounter = 180;
 		}
 		
 		// update magic ring!
