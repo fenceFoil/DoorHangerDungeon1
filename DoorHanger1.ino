@@ -11,6 +11,15 @@ CRGB strip[1];
 #define SFT_CLK A4
 #define SFT_DATA A5
 
+/**
+Color Notes:
+"True" white: HSV 96, 36, * (THOUGH 255 255 255 is reasonable if color correction is removed.)
+
+Hue for Red, Orange, Yellow, Green, Ice, Blue, Purple, Pink:
+0, 31, 56, 95, 138, 161, 183, 225
+
+ */
+
 // Tree of room connections (indexes in player light addresses)
 struct Room {
 	byte numNeighbors;
@@ -38,18 +47,23 @@ void setupMap () {
 // The secret passages links are at the end of the list of neighbors --
 // just "extend" list of neighbors to cover or hide them.
 void setSecretPassagesLight(byte light, byte state);
+// Secret passage flicker on animation
+byte passageAnimFrame = 0;
 void setPassagesOpen(bool open) {
-	if (open) {
-		rooms[2].numNeighbors = 2;
-		rooms[3].numNeighbors = 2;
-		rooms[4].numNeighbors = 3;
-	} else {
-		rooms[2].numNeighbors = 1;
-		rooms[3].numNeighbors = 0;
-		rooms[4].numNeighbors = 2;
+	if (arePassagesOpen() != open) {
+		if (open) {
+			rooms[2].numNeighbors = 2;
+			rooms[3].numNeighbors = 2;
+			rooms[4].numNeighbors = 3;
+		} else {
+			rooms[2].numNeighbors = 1;
+			rooms[3].numNeighbors = 0;
+			rooms[4].numNeighbors = 2;
+		}
+		setSecretPassagesLight(0, !open);
+		setSecretPassagesLight(1, open);
+		passageAnimFrame = 0;
 	}
-	setSecretPassagesLight(0, !open);
-	setSecretPassagesLight(1, open);
 }
 
 bool arePassagesOpen() {
@@ -160,6 +174,7 @@ void setSecretSwitchLight(byte state) {
 
 // Wanderer's location
 int currRoom = 0;
+int lastRoom = 0;
 
 // Follows a few rules to choose which room the wanderer visits next
 int getNextWanderRoom () {
@@ -196,7 +211,9 @@ int getNextWanderRoom () {
 
 // Timing counters, used for animation
 byte playerCounter = 0;
-byte passagesCounter = 30;
+#define NO_TRAIL_REMAINING 255
+byte playerTrailRemaining = 0;
+byte passagesCounter = 10;
 byte ringCounter = 0;
 byte currRingLight = 0;
 
@@ -211,8 +228,15 @@ unsigned int time = 0;
 #define CRYPT_FIGHT_STATE 2
 #define ZOMBIE_FIGHT_STATE 3
 #define MAGIC_STUFF_ANIMATION 4
+#define START_FLOOR_ANIMATION 5
 
 byte state = WANDER_STATE;
+
+// Secret switch
+#define SWITCH_BLINK
+#define SWITCH_OFF
+#define SWITCH_ON
+byte secretSwitchMode = 0;
 
 // Magic stuff
 byte magicStuffFlags = 0;
@@ -229,6 +253,25 @@ void magicStuffAnimation (byte newStuffNum) {
 }
 
 void loop() {
+	// Update individual animation state machines
+	// Secret passage lights
+	if (passageAnimFrame < 40) {
+		passageAnimFrame++;
+		// Flicker out once before popping on completely
+		if ((passageAnimFrame > 10) && (passageAnimFrame <= 10+10)) {
+			setSecretPassagesLight(0, arePassagesOpen());
+			setSecretPassagesLight(1, !arePassagesOpen());
+		} else {
+			setSecretPassagesLight(0, !arePassagesOpen());
+			setSecretPassagesLight(1, arePassagesOpen());
+		}
+	} else if (passageAnimFrame == 40) {
+		passageAnimFrame = 150; // past 40
+		setSecretPassagesLight(0, !arePassagesOpen());
+		setSecretPassagesLight(1, arePassagesOpen());
+	}
+	
+	// Update main state machine
 	if (state == WANDER_STATE) {
 		time++;
 		
@@ -240,8 +283,9 @@ void loop() {
 			magicStuffAnimation (2);
 		}
 
+		// Update RGB lamp
 		if (currRoom == 3) {
-			strip[0] = CHSV ((time*3) % 256, 255, 255);
+			strip[0] = CHSV ((time*3) % 256, 255, 127);
 			FastLED.show();
 		} else {
 			// Pulse at 1 hz
@@ -253,16 +297,21 @@ void loop() {
 			FastLED.show();
 		}
 
+		// Move player
 		if (--playerCounter <= 0) {
-			
-			setPlayerLight(currRoom, 0);
+			//setPlayerLight(currRoom, 0); // Let it stay on for a little
+			lastRoom = currRoom;
 			currRoom = getNextWanderRoom();
 			rooms[currRoom].visited = true;
 			setPlayerLight(currRoom, 1);
 			
 			playerCounter = 180;
+			if (lastRoom != currRoom) {
+				playerTrailRemaining = 10;
+			}
 		}
 		
+		// Toggle secret passages at random
 		if (--passagesCounter <= 0) {
 			setPassagesOpen(random(6) > 2);
 			passagesCounter = 180;
@@ -307,5 +356,16 @@ void loop() {
 		
 		magicStuffAnimTime++;
 		delay(1000/50);
+	} else if (state == START_FLOOR_ANIMATION) {
+		
+	}
+		
+	// After a moment turn off the player's trail
+	if (playerTrailRemaining != NO_TRAIL_REMAINING) {
+		playerTrailRemaining--;
+		if (playerTrailRemaining == 0) {
+			playerTrailRemaining = NO_TRAIL_REMAINING;
+			setPlayerLight(lastRoom, 0);
+		}
 	}
 }
