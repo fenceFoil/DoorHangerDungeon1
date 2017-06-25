@@ -307,7 +307,7 @@ void loop() {
 			
 			playerCounter = 180;
 			if (lastRoom != currRoom) {
-				playerTrailRemaining = 10;
+				playerTrailRemaining = 6;
 			}
 		}
 		
@@ -328,11 +328,11 @@ void loop() {
 			ringCounter = 10;
 		}
 		
-		delay(1000/fps);
+		delay(800/fps);
 	} else if (state == MAGIC_STUFF_ANIMATION) {
 		// Show an animation
 		if (magicStuffAnimTime == 0) {
-			strip[0] = CRGB (0,0,0);
+			strip[0] = CRGB (0, 0, 0);
 			FastLED.show();
 		}
 		
@@ -352,7 +352,6 @@ void loop() {
 			// End animation
 			state = WANDER_STATE;
 		}
-		
 		
 		magicStuffAnimTime++;
 		delay(1000/50);
